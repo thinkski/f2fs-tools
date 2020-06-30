@@ -856,9 +856,10 @@ int sanity_check_raw_super(struct f2fs_super_block *sb, enum SB_ADDR sb_addr)
 		return -1;
 	}
 
-	if (total_sections > segment_count ||
+	if (!(get_sb(feature) & cpu_to_le32(F2FS_FEATURE_RO)) &&
+			(total_sections > segment_count ||
 			total_sections < F2FS_MIN_SEGMENTS ||
-			segs_per_sec > segment_count || !segs_per_sec) {
+			segs_per_sec > segment_count || !segs_per_sec)) {
 		MSG(0, "\tInvalid segment/section count (%u, %u x %u)\n",
 			segment_count, total_sections, segs_per_sec);
 		return 1;
@@ -1254,8 +1255,9 @@ int sanity_check_ckpt(struct f2fs_sb_info *sbi)
 	ovp_segments = get_cp(overprov_segment_count);
 	reserved_segments = get_cp(rsvd_segment_count);
 
-	if (fsmeta < F2FS_MIN_SEGMENT || ovp_segments == 0 ||
-					reserved_segments == 0) {
+	if (!(get_sb(feature) & cpu_to_le32(F2FS_FEATURE_RO)) &&
+		(fsmeta < F2FS_MIN_SEGMENT || ovp_segments == 0 ||
+					reserved_segments == 0)) {
 		MSG(0, "\tWrong layout: check mkfs.f2fs version\n");
 		return 1;
 	}
@@ -1263,7 +1265,7 @@ int sanity_check_ckpt(struct f2fs_sb_info *sbi)
 	user_block_count = get_cp(user_block_count);
 	segment_count_main = get_sb(segment_count_main);
 	log_blocks_per_seg = get_sb(log_blocks_per_seg);
-	if (!user_block_count || user_block_count >=
+	if (!user_block_count || user_block_count >
 			segment_count_main << log_blocks_per_seg) {
 		ASSERT_MSG("\tWrong user_block_count(%u)\n", user_block_count);
 
@@ -2765,11 +2767,15 @@ int find_next_free_block(struct f2fs_sb_info *sbi, u64 *to, int left,
 static void move_one_curseg_info(struct f2fs_sb_info *sbi, u64 from, int left,
 				 int i)
 {
+	struct f2fs_super_block *sb = F2FS_RAW_SUPER(sbi);
 	struct curseg_info *curseg = CURSEG_I(sbi, i);
 	struct f2fs_summary_block buf;
 	u32 old_segno;
 	u64 ssa_blk, to;
 	int ret;
+
+	if ((get_sb(feature) & cpu_to_le32(F2FS_FEATURE_RO)))
+		return 0;
 
 	/* update original SSA too */
 	ssa_blk = GET_SUM_BLKADDR(sbi, curseg->segno);

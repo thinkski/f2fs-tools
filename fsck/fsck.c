@@ -2369,9 +2369,14 @@ static int check_curseg_write_pointer(struct f2fs_sb_info *UNUSED(sbi),
 
 int check_curseg_offset(struct f2fs_sb_info *sbi, int type)
 {
+	struct f2fs_super_block *sb = F2FS_RAW_SUPER(sbi);
 	struct curseg_info *curseg = CURSEG_I(sbi, type);
 	struct seg_entry *se;
 	int j, nblocks;
+
+	if ((get_sb(feature) & cpu_to_le32(F2FS_FEATURE_RO)) &&
+		(type != CURSEG_HOT_DATA && type != CURSEG_HOT_NODE))
+		return 0;
 
 	if ((curseg->next_blkoff >> 3) >= SIT_VBLOCK_MAP_SIZE) {
 		ASSERT_MSG("Next block offset:%u is invalid, type:%d",
@@ -2955,6 +2960,7 @@ void fsck_chk_and_fix_write_pointers(struct f2fs_sb_info *sbi)
 
 int fsck_chk_curseg_info(struct f2fs_sb_info *sbi)
 {
+	struct f2fs_super_block *sb = F2FS_RAW_SUPER(sbi);
 	struct curseg_info *curseg;
 	struct seg_entry *se;
 	struct f2fs_summary_block *sum_blk;
@@ -2964,6 +2970,10 @@ int fsck_chk_curseg_info(struct f2fs_sb_info *sbi)
 		curseg = CURSEG_I(sbi, i);
 		se = get_seg_entry(sbi, curseg->segno);
 		sum_blk = curseg->sum_blk;
+
+		if ((get_sb(feature) & cpu_to_le32(F2FS_FEATURE_RO)) &&
+			(i != CURSEG_HOT_DATA && i != CURSEG_HOT_NODE))
+			continue;
 
 		if (se->type != i) {
 			ASSERT_MSG("Incorrect curseg [%d]: segno [0x%x] "
